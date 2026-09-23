@@ -1,0 +1,57 @@
+{
+  "name": "pi-extension-google-workspace",
+  "version": "0.1.0",
+  "description": "Google Workspace extension for Pi with multi-account OAuth, account cycling commands, and a compact account indicator",
+  "type": "module",
+  "license": "Apache-2.0",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "google-workspace",
+    "gmail",
+    "google-drive",
+    "google-calendar"
+  ],
+  "files": [
+    "extensions",
+    "scripts",
+    "skills",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "check": "npm run typecheck && npm test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "googleapis": "^171.0.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.5",
+    "typebox": "^1.0.0",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

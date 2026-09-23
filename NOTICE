@@ -1,0 +1,10 @@
+pi-extension-google-workspace
+
+This product includes modified portions of the google-workspace skill from
+mitsuhiko/agent-stuff, Copyright its contributors, licensed under the Apache
+License, Version 2.0.
+
+Upstream source: https://github.com/mitsuhiko/agent-stuff/tree/main/skills/google-workspace
+Upstream revision used: 13bc8f87970bec8830aab0f1c0487d35aa7c0917
+
+The modified files carry notices describing the changes.
