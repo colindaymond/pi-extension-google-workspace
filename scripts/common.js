@@ -146,7 +146,22 @@ function normalizeEmail(email) {
     throw new Error(`Invalid email address: ${email}`);
   }
 
-  return normalized;
+  return canonicalizeGmail(normalized);
+}
+
+// Gmail ignores dots in the local part: first.last@gmail.com and
+// firstlast@gmail.com are the same mailbox.
+const GMAIL_DOMAINS = new Set(['gmail.com', 'googlemail.com']);
+
+function canonicalizeGmail(email) {
+  const at = email.lastIndexOf('@');
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!GMAIL_DOMAINS.has(domain)) {
+    return email;
+  }
+  const canonicalLocal = local.replace(/\./g, '');
+  return canonicalLocal ? `${canonicalLocal}@${domain}` : email;
 }
 
 function tokenFilenameForEmail(email) {
@@ -154,7 +169,19 @@ function tokenFilenameForEmail(email) {
 }
 
 function tokenPathForEmail(email) {
-  return path.join(TOKENS_DIR, tokenFilenameForEmail(email));
+  const canonicalPath = path.join(TOKENS_DIR, tokenFilenameForEmail(email));
+  if (fs.existsSync(canonicalPath) || !fs.existsSync(TOKENS_DIR)) {
+    return canonicalPath;
+  }
+
+  // Fall back to token files saved before Gmail dot-canonicalization.
+  const normalizedEmail = normalizeEmail(email);
+  for (const entry of fs.readdirSync(TOKENS_DIR)) {
+    if (decodeEmailFromTokenFilename(entry) === normalizedEmail) {
+      return path.join(TOKENS_DIR, entry);
+    }
+  }
+  return canonicalPath;
 }
 
 function tokenExists(email) {

@@ -24,6 +24,13 @@ test("normalizes and validates email addresses", () => {
   assert.throws(() => normalizeEmail("not-an-email"), /Invalid email/);
 });
 
+test("ignores dots in Gmail local parts only", () => {
+  assert.equal(normalizeEmail("First.Last@gmail.com"), "firstlast@gmail.com");
+  assert.equal(normalizeEmail("firstlast@gmail.com"), "firstlast@gmail.com");
+  assert.equal(normalizeEmail("a.b@googlemail.com"), "ab@googlemail.com");
+  assert.equal(normalizeEmail("first.last@example.com"), "first.last@example.com");
+});
+
 test("lists independent account credential profiles", async (t) => {
   const root = await fixture();
   t.after(() => rm(root, { recursive: true, force: true }));

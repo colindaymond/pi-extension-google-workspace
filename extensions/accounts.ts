@@ -30,7 +30,20 @@ export function normalizeEmail(value: string): string {
 	if (!/^[^@\s]+@[^@\s]+$/.test(email)) {
 		throw new Error(`Invalid email address: ${value}`);
 	}
-	return email;
+	return canonicalizeGmail(email);
+}
+
+// Gmail ignores dots in the local part: first.last@gmail.com and
+// firstlast@gmail.com are the same mailbox.
+const GMAIL_DOMAINS = new Set(["gmail.com", "googlemail.com"]);
+
+function canonicalizeGmail(email: string): string {
+	const at = email.lastIndexOf("@");
+	const local = email.slice(0, at);
+	const domain = email.slice(at + 1);
+	if (!GMAIL_DOMAINS.has(domain)) return email;
+	const canonicalLocal = local.replace(/\./g, "");
+	return canonicalLocal ? `${canonicalLocal}@${domain}` : email;
 }
 
 export function getConfigDir(): string {
