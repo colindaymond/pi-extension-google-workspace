@@ -23,6 +23,8 @@ export interface WorkspaceAccount {
 
 interface ExtensionConfig {
 	selectedAccount?: string;
+	workAccount?: string;
+	[key: string]: unknown;
 }
 
 export function normalizeEmail(value: string): string {
@@ -104,21 +106,44 @@ export function listAccounts(configDir = getConfigDir()): WorkspaceAccount[] {
 	return accounts.sort((left, right) => left.email.localeCompare(right.email));
 }
 
-export function readSelectedAccount(configDir = getConfigDir()): string | undefined {
+function readExtensionConfig(configDir: string): ExtensionConfig {
 	const path = getExtensionConfigPath(configDir);
-	if (!existsSync(path)) return undefined;
+	if (!existsSync(path)) return {};
 	try {
-		const config = JSON.parse(readFileSync(path, "utf8")) as ExtensionConfig;
-		return typeof config.selectedAccount === "string" ? normalizeEmail(config.selectedAccount) : undefined;
+		const config: unknown = JSON.parse(readFileSync(path, "utf8"));
+		return config && typeof config === "object" && !Array.isArray(config) ? config as ExtensionConfig : {};
+	} catch {
+		return {};
+	}
+}
+
+function readAccountPreference(key: "selectedAccount" | "workAccount", configDir: string): string | undefined {
+	try {
+		const value = readExtensionConfig(configDir)[key];
+		return typeof value === "string" ? normalizeEmail(value) : undefined;
 	} catch {
 		return undefined;
 	}
 }
 
-export function writeSelectedAccount(email: string | undefined, configDir = getConfigDir()): void {
+export function readSelectedAccount(configDir = getConfigDir()): string | undefined {
+	return readAccountPreference("selectedAccount", configDir);
+}
+
+export function readWorkAccount(configDir = getConfigDir()): string | undefined {
+	return readAccountPreference("workAccount", configDir);
+}
+
+function writeAccountPreference(
+	key: "selectedAccount" | "workAccount",
+	email: string | undefined,
+	configDir: string,
+): void {
+	const config = readExtensionConfig(configDir);
+	if (email !== undefined) config[key] = normalizeEmail(email);
+	else delete config[key];
 	const path = getExtensionConfigPath(configDir);
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-	const config: ExtensionConfig = email ? { selectedAccount: normalizeEmail(email) } : {};
 	const temporaryPath = `${path}.${process.pid}.tmp`;
 	writeFileSync(temporaryPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 	renameSync(temporaryPath, path);
@@ -127,6 +152,14 @@ export function writeSelectedAccount(email: string | undefined, configDir = getC
 	} catch {
 		// Ignore chmod failures on non-POSIX file systems.
 	}
+}
+
+export function writeSelectedAccount(email: string | undefined, configDir = getConfigDir()): void {
+	writeAccountPreference("selectedAccount", email, configDir);
+}
+
+export function writeWorkAccount(email: string | undefined, configDir = getConfigDir()): void {
+	writeAccountPreference("workAccount", email, configDir);
 }
 
 export function resolveSelectedAccount(

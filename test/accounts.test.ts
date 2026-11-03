@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,9 +8,11 @@ import {
   listAccounts,
   normalizeEmail,
   readSelectedAccount,
+  readWorkAccount,
   removeAccountToken,
   resolveSelectedAccount,
   writeSelectedAccount,
+  writeWorkAccount,
 } from "../extensions/accounts.js";
 
 async function fixture() {
@@ -82,4 +84,43 @@ test("removes only the requested account token", async (t) => {
   writeFileSync(tokenPath, JSON.stringify({ __email: "user@example.com" }));
   assert.equal(removeAccountToken("user@example.com", root), true);
   assert.equal(removeAccountToken("user@example.com", root), false);
+});
+
+test("work preference survives selection changes and preserves other settings", async (t) => {
+  const root = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, "pi-extension.json");
+  writeFileSync(path, JSON.stringify({ selectedAccount: "home@example.com", futureSetting: true }));
+  writeWorkAccount(" WORK@Example.com ", root);
+  assert.equal(readWorkAccount(root), "work@example.com");
+  assert.equal(readSelectedAccount(root), "home@example.com");
+  writeSelectedAccount("other@example.com", root);
+  assert.equal(readWorkAccount(root), "work@example.com");
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).futureSetting, true);
+  writeSelectedAccount(undefined, root);
+  assert.equal(readSelectedAccount(root), undefined);
+  assert.equal(readWorkAccount(root), "work@example.com");
+  writeSelectedAccount("home@example.com", root);
+  writeWorkAccount(undefined, root);
+  assert.equal(readWorkAccount(root), undefined);
+  assert.equal(readSelectedAccount(root), "home@example.com");
+  if (process.platform !== "win32") assert.equal(statSync(path).mode & 0o777, 0o600);
+});
+
+test("work preference handles invalid and legacy configuration safely", async (t) => {
+  const root = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, "pi-extension.json");
+  assert.equal(readWorkAccount(root), undefined);
+  writeSelectedAccount("home@example.com", root);
+  assert.equal(readWorkAccount(root), undefined);
+  assert.throws(() => writeWorkAccount("not-an-email", root), /Invalid email/);
+  assert.equal(readSelectedAccount(root), "home@example.com");
+  writeFileSync(path, JSON.stringify({ selectedAccount: "home@example.com", workAccount: "bad" }));
+  assert.equal(readWorkAccount(root), undefined);
+  assert.equal(readSelectedAccount(root), "home@example.com");
+  writeFileSync(path, "broken json");
+  assert.equal(readWorkAccount(root), undefined);
+  writeWorkAccount("work@example.com", root);
+  assert.equal(readWorkAccount(root), "work@example.com");
 });

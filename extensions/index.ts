@@ -15,9 +15,11 @@ import {
 	listAccounts,
 	normalizeEmail,
 	readSelectedAccount,
+	readWorkAccount,
 	removeAccountToken,
 	resolveSelectedAccount,
 	writeSelectedAccount,
+	writeWorkAccount,
 	type WorkspaceAccount,
 } from "./accounts.js";
 
@@ -187,6 +189,23 @@ export default function googleWorkspaceExtension(pi: ExtensionAPI) {
 		);
 	}
 
+	function configureWorkAccount(args: string, ctx: ExtensionContext): void {
+		refreshState();
+		const value = args.trim();
+		if (!value) {
+			ctx.ui.notify(`Google Workspace work account: ${readWorkAccount(configDir) ?? "not configured"}`, "info");
+			return;
+		}
+		if (value.toLowerCase() === "clear") {
+			writeWorkAccount(undefined, configDir);
+			ctx.ui.notify("Cleared the Google Workspace work-account preference.", "info");
+			return;
+		}
+		const email = resolveToolAccount(value);
+		writeWorkAccount(email, configDir);
+		ctx.ui.notify(`Work-related Google Workspace tasks and work emails to you will use ${email}.`, "info");
+	}
+
 	async function login(rawArgs: string, ctx: ExtensionContext): Promise<void> {
 		const args = splitArguments(rawArgs);
 		const email = args.shift();
@@ -249,6 +268,15 @@ export default function googleWorkspaceExtension(pi: ExtensionAPI) {
 		description: "Show the active Google Workspace account",
 		handler: async (_args, ctx) => showStatus(ctx),
 	});
+	pi.registerCommand("gw-work", {
+		description: "Show or set the work account and work email recipient: [EMAIL|clear]",
+		getArgumentCompletions: (prefix) => {
+			const matches = accountCompletions(prefix) ?? [];
+			if ("clear".startsWith(prefix)) matches.push({ value: "clear", label: "clear work preference" });
+			return matches.length ? matches : null;
+		},
+		handler: async (args, ctx) => configureWorkAccount(args, ctx),
+	});
 	pi.registerCommand("gw-login", {
 		description: "Sign in a Google Workspace account",
 		handler: login,
@@ -260,13 +288,14 @@ export default function googleWorkspaceExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("input", async (event, ctx) => {
-		const match = event.text.trim().match(/^\\(gw|gw-use|gw-next|gw-prev|gw-status|gw-login|gw-logout)(?:\s+(.*))?$/);
+		const match = event.text.trim().match(/^\\(gw|gw-use|gw-next|gw-prev|gw-status|gw-work|gw-login|gw-logout)(?:\s+(.*))?$/);
 		if (!match) return { action: "continue" };
 		const [, command, args = ""] = match;
 		if (command === "gw" || command === "gw-use") await chooseAccount(args, ctx);
 		else if (command === "gw-next") cycleAccount(1, ctx);
 		else if (command === "gw-prev") cycleAccount(-1, ctx);
 		else if (command === "gw-status") showStatus(ctx);
+		else if (command === "gw-work") configureWorkAccount(args, ctx);
 		else if (command === "gw-login") await login(args, ctx);
 		else if (command === "gw-logout") await logout(args, ctx);
 		return { action: "handled" };
@@ -284,6 +313,7 @@ export default function googleWorkspaceExtension(pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Use google_workspace for Google Workspace requests and keep API payloads small with fields/maxResults.",
 			"The google_workspace tool uses the currently selected GWS account unless the `account` parameter names another signed-in account; when a task spans multiple mailboxes, call the tool once per account with `account` set, and never claim to have queried an account that was not actually used.",
+			"Respect the work-account preference supplied in the system prompt: use that account explicitly for work tasks and as the recipient when the user asks to email work material to themselves, unless they explicitly specify another account or recipient.",
 		],
 		parameters: Type.Object({
 			script: Type.String({
@@ -345,6 +375,10 @@ export default function googleWorkspaceExtension(pi: ExtensionAPI) {
 		const accountContext = selectedAccount
 			? `The active Google Workspace account is ${selectedAccount}. The google_workspace tool uses it by default.${othersContext}`
 			: "No Google Workspace account is selected. Ask the user to run /gw or /gw-login before using google_workspace.";
-		return { systemPrompt: `${event.systemPrompt}\n\n${accountContext}` };
+		const workAccount = readWorkAccount(configDir);
+		const workContext = workAccount
+			? `\n\nGoogle Workspace work preference: ${workAccount}. Unless the user explicitly specifies another account or recipient, use google_workspace with account=${JSON.stringify(workAccount)} for all work-related email, documents, spreadsheets, calendar, and other Workspace tasks. Create work files in that account. When the user asks to email work material to themselves (\"email me\"), send from this account to ${workAccount}, not to the selected personal account. This preference persists even when /gw selects a different account; personal tasks still use the selected account. If the work account is not signed in, ask the user to run /gw-login ${workAccount}; never silently fall back to a personal account for work.`
+			: "";
+		return { systemPrompt: `${event.systemPrompt}\n\n${accountContext}${workContext}` };
 	});
 }

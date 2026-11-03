@@ -48,6 +48,7 @@ return { me, files: files.files };
 4. Return JSON-serializable data and never print OAuth tokens.
 5. Use the active account; account-changing commands are user-facing controls.
 6. For Gmail, use `userId: 'me'` unless the user explicitly requires otherwise.
+7. Respect the persistent work-account preference supplied in the system prompt. Unless explicitly overridden by the user, pass that work email as `account` for all work-related Workspace tasks, create work Docs/Sheets in that account, and use it as both sender and recipient when the user asks to "email me" work material. Personal tasks can still use the selected account. If the preferred work account is not signed in, ask for `/gw-login`; never silently fall back to personal. This preference is agent guidance: omitted `account` still uses the selected account.
 
 ## User account commands
 
@@ -57,6 +58,7 @@ Native Pi slash commands:
 - `/gw-use email@example.com` — select an account
 - `/gw-next` and `/gw-prev` — cycle accounts
 - `/gw-status` — show the active account
+- `/gw-work [email@example.com|clear]` — show, set, or clear the persistent work-account and work-email recipient preference
 - `/gw-login email@example.com` — sign in with the default cloud OAuth flow
 - `/gw-login email@example.com --credentials /path/to/credentials.json` — sign in with a local OAuth client
 - `/gw-logout [email@example.com]` — remove one account token after confirmation

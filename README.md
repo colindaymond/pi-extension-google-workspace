@@ -8,6 +8,7 @@ A [Pi](https://pi.dev) package for Gmail, Drive, Calendar, Docs, Sheets, Slides,
 - independent OAuth token profiles for multiple Google accounts
 - a persistent, very small footer indicator: `you@example.com`
 - quick account selection and cycling
+- a persistent work-account preference for work tasks and "email me" recipients
 - both native Pi `/slash` commands and literal `\backslash` aliases
 - optional separate OAuth client credentials for each account
 - a bundled skill that teaches Pi to use the tool safely
@@ -37,6 +38,7 @@ Restart Pi or run `/reload` after installation.
 | `/gw-next` | `\gw-next` | Cycle forward |
 | `/gw-prev` | `\gw-prev` | Cycle backward |
 | `/gw-status` | `\gw-status` | Show the active account |
+| `/gw-work [EMAIL\|clear]` | `\gw-work [EMAIL\|clear]` | Show, set, or clear the work-account preference |
 | `/gw-login EMAIL` | `\gw-login EMAIL` | Add or refresh an account |
 | `/gw-logout [EMAIL]` | `\gw-logout [EMAIL]` | Remove an account token |
 
@@ -94,12 +96,26 @@ return { me: me.email, events: events.items };
 
 The tool defaults to the account selected with `/gw`. The model can pass an optional `account` parameter (an email of any signed-in account) to run a single call against another mailbox without changing the selection — useful for searching several inboxes in one task. The system prompt lists the other signed-in accounts so the model knows what is available. Accounts that are not signed in still require the user to run `/gw-login`.
 
+### Work-account preference
+
+Configure a work default once:
+
+```text
+/gw-work work@example.com
+```
+
+Pi remembers this preference across sessions and adds it to the agent's instructions. Work-related Gmail, Drive, Docs, Sheets, Calendar, and other Workspace requests should use this account explicitly. When you ask to "email me" about work, the agent should send from this account to the same work address. Explicit account or recipient instructions override the preference.
+
+This is agent guidance, not a keyword classifier or a silent tool-level account override: a call without `account` still uses the selected account. `/gw-work` does not change `/gw` selection, so personal tasks can still use your selected personal account. If the work account is logged out, the agent should ask you to sign in rather than fall back to personal. Setting a preference requires a usable signed-in account.
+
+Use `/gw-work` to inspect the preference or `/gw-work clear` to remove it. Existing documents are not automatically moved or shared. After updating the extension code, run `/reload` once; later preference changes are read on each agent run without reloading.
+
 Tool output is capped at 50KB or 2,000 lines. Full oversized output is written to a mode-`0600` temporary file and its path is reported.
 
 ## Storage and security
 
 - Tokens: `~/.pi/google-workspace/tokens/<encoded-email>.json` (mode `0600` when created)
-- Selection: `~/.pi/google-workspace/pi-extension.json`
+- Selection and work preference: `~/.pi/google-workspace/pi-extension.json` (`selectedAccount`, `workAccount`)
 - Default local OAuth credentials: `~/.pi/google-workspace/credentials.json`
 - Override root: `GOOGLE_WORKSPACE_CONFIG_DIR`
 - Override token directory: `GOOGLE_WORKSPACE_TOKENS_DIR`
